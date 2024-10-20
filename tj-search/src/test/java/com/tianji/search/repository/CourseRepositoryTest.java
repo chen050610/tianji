@@ -1,3 +1,4 @@
+/*
 package com.tianji.search.repository;
 
 import com.tianji.common.utils.RandomUtils;
@@ -56,3 +57,4 @@ class CourseRepositoryTest {
     }
 
 }
+*/

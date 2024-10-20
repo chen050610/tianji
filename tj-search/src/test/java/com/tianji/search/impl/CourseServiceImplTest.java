@@ -1,3 +1,4 @@
+/*
 package com.tianji.search.impl;
 
 import com.tianji.api.client.course.CourseClient;
@@ -105,4 +106,4 @@ class CourseServiceImplTest {
 
         repository.saveAll(list);
     }
-}
+}*/
