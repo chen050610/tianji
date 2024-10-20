@@ -1,7 +1,6 @@
 package com.tianji.common.autoconfigure.redisson.enums;
 
 import com.tianji.common.autoconfigure.redisson.annotations.Lock;
-import com.tianji.common.exceptions.BizIllegalException;
 import org.redisson.api.RLock;
 
 public enum LockStrategy {
@@ -22,7 +21,7 @@ public enum LockStrategy {
         public boolean tryLock(RLock lock, Lock properties) throws InterruptedException {
             boolean success = lock.tryLock(0, properties.leaseTime(), properties.timeUnit());
             if (!success) {
-                throw new BizIllegalException("请求太频繁");
+                throw new RuntimeException("请求太频繁");
             }
             return true;
         }
@@ -44,7 +43,7 @@ public enum LockStrategy {
         public boolean tryLock(RLock lock, Lock properties) throws InterruptedException {
             boolean success = lock.tryLock(properties.waitTime(), properties.leaseTime(), properties.timeUnit());
             if (!success) {
-                throw new BizIllegalException("请求超时");
+                throw new RuntimeException("请求超时");
             }
             return true;
         }

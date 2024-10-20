@@ -12,7 +12,6 @@ import com.tianji.pay.sdk.dto.PayApplyDTO;
 import com.tianji.pay.sdk.dto.PayChannelDTO;
 import com.tianji.pay.sdk.dto.PayResultDTO;
 import com.tianji.trade.config.TradeProperties;
-import com.tianji.trade.constants.OrderCancelReason;
 import com.tianji.trade.constants.OrderStatus;
 import com.tianji.trade.constants.TradeErrorInfo;
 import com.tianji.trade.domain.dto.OrderDelayQueryDTO;
@@ -123,8 +122,7 @@ public class PayServiceImpl implements IPayService {
         if(PayResultDTO.SUCCESS != status){
             // 3.1.支付中或支付失败，需要重试查询
             if(message.getDelayMillis().size() == 0){
-                // 重试次数用尽，如果依然未支付，则取消订单
-                orderService.cancelOrder(orderId, OrderCancelReason.TIME_OUT);
+                // 重试次数用尽，结束
                 return;
             }
             // 发送延迟查询消息，再次查询支付状态
