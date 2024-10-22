@@ -4,6 +4,8 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.date.LocalDateTimeUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.plugins.pagination.PageDto;
 import com.tianji.api.client.course.CatalogueClient;
@@ -16,9 +18,12 @@ import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.UserContext;
+import com.tianji.learning.domain.dto.LearningPlanDTO;
 import com.tianji.learning.domain.po.LearningLesson;
 import com.tianji.learning.domain.vo.LearningLessonVO;
+import com.tianji.learning.domain.vo.LearningPlanPageVO;
 import com.tianji.learning.enums.LessonStatus;
+import com.tianji.learning.enums.PlanStatus;
 import com.tianji.learning.mapper.LearningLessonMapper;
 import com.tianji.learning.service.ILearningLessonService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -26,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.yaml.snakeyaml.events.Event;
 
+import java.nio.channels.WritePendingException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -152,6 +158,120 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         returnVo.setCourseCoverUrl(coverUrl);
         returnVo.setSections(sections);
         return returnVo;
+    }
+
+    @Override
+    public Long isLessonValid(Long courseId) {
+        //1.获取当前的用户
+        Long userId = UserContext.getUser();
+        if (userId == null){
+            throw new BadRequestException("用户未登录");
+        }
+        //2.查询课程是否存在 并且状态是正常的
+        LearningLesson result = this.lambdaQuery()
+                .eq(LearningLesson::getCourseId, courseId)
+                .eq(LearningLesson::getUserId, userId)
+                .one();
+        if (result == null){
+            return null;
+        }
+        LocalDateTime expireTime = result.getExpireTime();
+        LocalDateTime nowTime = LocalDateTime.now();
+        if (expireTime != null && nowTime.isAfter(expireTime)){
+            //课程过期
+            return null;
+        }
+        return result.getId();
+    }
+
+    @Override
+    public void removeLesson(Long userId, List<Long> courseIds) {
+        LambdaQueryChainWrapper<LearningLesson> wrapper = this.lambdaQuery()
+                .eq(LearningLesson::getUserId, userId)
+                .in(LearningLesson::getCourseId, courseIds);
+        this.remove(wrapper);
+    }
+
+    @Override
+    public LearningLessonVO getLessonStatus(Long courseId) {
+        //1.获取当前的用户
+        Long userId = UserContext.getUser();
+        if (userId == null){
+            throw new BadRequestException("当前用户未登录");
+        }
+        //2.查询
+        LearningLesson lesson = this.getOne(this.lambdaQuery()
+                .eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, courseId));
+        if (lesson == null){
+            //说明没有购买 加入到我的课程中
+            return null;
+        }
+        LearningLessonVO result = BeanUtil.toBean(lesson, LearningLessonVO.class);
+        result.setLatestSectionIndex(null);
+        result.setSections(null);
+        result.setCourseName(null);
+        result.setCourseCoverUrl(null);
+        result.setCourseAmount(null);
+        result.setWeekFreq(null);
+        return result;
+    }
+
+    @Override
+    public Integer countLearningLessonByCourse(Long courseId) {
+        Integer nums = this.lambdaQuery()
+                .eq(LearningLesson::getCourseId, courseId)
+                .count();
+        return nums;
+    }
+
+    @Override
+    public void createLearningPlan(LearningPlanDTO dto) {
+        //1.获取当前登录人
+        Long userId = UserContext.getUser();
+        if (userId == null){
+            throw new BadRequestException("当前用户未登录");
+        }
+        //2.查询
+        LearningLesson lesson = this.lambdaQuery()
+                .eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, dto.getCourseId())
+                .one();
+        if (lesson == null){
+            throw new BizIllegalException("该课程未加入课表");
+        }
+        // 3.修改
+        /*lesson.setWeekFreq(dto.getFreq());
+        this.updateById(lesson); */
+        this.lambdaUpdate()
+                .set(LearningLesson::getWeekFreq,dto.getFreq())
+                .set(LearningLesson::getPlanStatus, PlanStatus.PLAN_RUNNING)
+                .eq(LearningLesson::getId,lesson.getId())
+                .update();
+    }
+
+    @Override
+    public LearningPlanPageVO queryMyPlans(PageQuery query) {
+        //1.获取当前登录用户
+        Long userId = UserContext.getUser();
+        if (userId == null){
+            throw new BadRequestException("用户未登录");
+        }
+        //todo:2.查询积分
+        //3.查询本周学习计划总数据 和 已经学习的计划总数据
+        QueryWrapper<LearningLesson> wrapper = new QueryWrapper<>();
+        wrapper.select("sum(week_freq) as plansTotal");
+        wrapper.eq("user_id",userId);
+        wrapper.in("status",LessonStatus.LEARNING,LessonStatus.NOT_BEGIN);
+        wrapper.eq("plan_status",PlanStatus.PLAN_RUNNING);
+        Map<String, Object> map = this.getMap(wrapper);
+        //本周学习计划的总数 plansTotal
+        Integer plansTotal = Integer.valueOf(map.get("plansTotal").toString());
+        //4.查询课表数据
+
+        //5.远程调用课程服务获取课程的信息
+
+        //6.查询学习记录表 本周 当前用户 每一门的已经学习的小节的数量
     }
 
 

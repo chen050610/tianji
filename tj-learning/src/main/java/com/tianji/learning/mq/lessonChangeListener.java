@@ -36,11 +36,11 @@ public class lessonChangeListener {
      */ 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(value = "learning.lesson.pay.queue",durable = "true"),
-            exchange = @Exchange(value = MqConstants.Exchange.ORDER_EXCHANGE),
+            exchange = @Exchange(value = MqConstants.Exchange.ORDER_EXCHANGE,type = "topic"),
             key = MqConstants.Key.ORDER_PAY_KEY
     ))
-    public void onMessage(OrderBasicDTO dto){
-        log.info("lessonChangeListener监听到消息---->"+dto);
+    public void onAddMessage(OrderBasicDTO dto){
+        log.info("lessonChangeListener监听到添加消息---->"+dto);
         //1.参数的校验
         if (CollUtil.isEmpty(dto.getCourseIds())
         ||dto.getUserId() == null
@@ -49,5 +49,30 @@ public class lessonChangeListener {
             return;
         }
         lessonService.addUserLesson(dto.getUserId(),dto.getCourseIds());
+    }
+    
+    /** 
+     * @description: 用户退款成功以后需要删除该课程
+     * @param: 
+ * @param null  
+     * @return:  
+     * @author chenw
+     * @date: 2024/10/21 下午3:58
+     */
+    @RabbitListener(bindings = @QueueBinding(
+            value = @Queue(value = "learning.lesson.refund.queue",durable = "true"),
+            exchange = @Exchange(value = MqConstants.Exchange.ORDER_EXCHANGE,type = "topic"),
+            key = MqConstants.Key.ORDER_REFUND_KEY
+    ))
+    public void onRemoveMessage(OrderBasicDTO dto){
+        log.info("lessonChangeListener监听到退款消息---->"+dto);
+        //1.参数的校验
+        if (CollUtil.isEmpty(dto.getCourseIds())
+                ||dto.getUserId() == null
+                ||dto.getOrderId() == null
+        ){
+            return;
+        }
+        lessonService.removeLesson(dto.getUserId(),dto.getCourseIds());
     }
 }
